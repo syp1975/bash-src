@@ -1,0 +1,127 @@
+#!/bin/bash
+#setup basics on a fresh install of ubuntu.
+#installs some usefull packages, enables unattended upgrades and hardens remote access.
+#uses this variables:
+#UNWANTED_SERVICES=space-separated-list of services to disable
+#UNWANTED_PACKAGES=space-separated-list of packages to remove
+#WANTED_PACKAGES=space-separated-list of packages to install
+#UNWANTED_MOTD=space-separated-list of motd modules in /etc/update-motd.d/ to disable, do not include trailing digit>
+#WANTED_MOTD=space-separated-list of motd modules to download from repo into /etc/update-motd.d/, include trailing d>
+#LOCALES=space-separated-list of locales to generate, first one will be selected as default. see /usr/share/i18n/locales
+#CHARMAP=char encoding used to generate the locales and display text on the console. defaults to UTF-8. see /usr/share/i18n/charmaps
+#CODESET=set of characters used to display text on the console. defaults to Uni2. see man console-setup
+#KB_LAYOUT=changes the keyboard layout. see /usr/share/X11/xkb/rules/xorg.lst.
+#KB_VARIANT=changes the keyboard variant. see /usr/share/X11/xkb/rules/xorg.lst
+#SSHD_PORT=if different than 22, enables endlessh tarpit on port 22/tcp and changes sshd listening port to this tcp port. Example: 2222
+#SSHD_PUBKEY=if a public key is defined, enables pubkey authentication and disables password authentication.
+
+if [ ! -z "$UNWANTED_SERVICES" ]; then
+  msg-blue "Disabling unwanted services ..."
+  systemctl stop "$UNWANTED_SERVICES"
+  systemctl disable "$UNWANTED_SERVICES"
+fi
+
+if [ ! -z "$UNWANTED_PACKAGES" ]; then
+  msg-blue "Removing unwanted packages ..."
+  apt-get purge -qy $UNWANTED_PACKAGES
+fi
+
+msg-blue "Updating ..."
+apt-get update -q && apt-get upgrade -qy
+
+msg-blue "Installing packages ..."
+apt-get install -qy ufw $WANTED_PACKAGES
+
+msg-blue "Cleaning ..."
+apt-get install -qqf && apt-get autoremove --purge -qqy && apt-get clean -qq
+
+msg-blue "Configuring unattended upgrades ..."
+cfgset /etc/apt/apt.conf.d/50unattended-upgrades 'Unattended-Upgrade::Remove-Unused-Dependencies' '"true";'
+cfgset /etc/apt/apt.conf.d/50unattended-upgrades 'Unattended-Upgrade::Automatic-Reboot' '"true";'
+cfgset /etc/apt/apt.conf.d/50unattended-upgrades 'Unattended-Upgrade::Automatic-Reboot-WithUsers' '"false";'
+cfgset /etc/apt/apt.conf.d/50unattended-upgrades 'Unattended-Upgrade::Automatic-Reboot-Time' '"02:00";'
+systemctl restart unattended-upgrades.service
+
+msg-blue "Removing unwanted MOTD modules ..."
+cfgset /etc/default/motd-news ENABLED = 0
+if [ ! -z "$UNWANTED_MOTD" ]; then
+  pushd /etc/update-motd.d/
+  chmod -x "$UNWANTED_MOTD"
+  popd
+fi
+
+if [ ! -z "$WANTED_MOTD" ]; then
+  IFS=' '
+  pushd /etc/update-motd.d/
+  for file in "$WANTED_MOTD"; do
+    name=$(basename "$file")
+    msg-blue "Installing motd $name ..."
+    pg cat "$file" | envsubst > "$name"
+    chmod +x "$name"
+  done
+  popd
+fi
+
+if [ ! -z "$LOCALES" ]; then
+  CHARSET=${CHARMAP:-"UTF-8"}
+  IFS=' '
+  LNG=''
+  #adds computer locale by default
+  echo 'C.UTF-8 UTF-8' > /etc/locale.gen
+  for LOCALE in $LOCALES; do
+    msg-blue "Adding locale $LOCALE $CHARSET ..."
+    echo $LOCALE $CHARSET > /etc/locale.gen
+    if [ -z "$LNG" ]; then
+      LNG=$LOCALE
+    fi
+  done
+  msg-blue "Generating locales ..."
+  locale-gen
+  msg-blue "Setting default locale to $LNG ..."
+  update-locale LANG=$LNG
+fi
+
+msg-blue "Configuring keyboard map and character set ..."
+[ ! -z "$CHARMAP" ] && cfgset /etc/default/console-setup CHARMAP = $CHARMAP
+[ ! -z "$CODESET" ] && cfgset /etc/default/console-setup CODESET = $CODESET
+[ ! -z "$KB_LAYOUT" ] && cfgset /etc/default/keyboard XKBLAYOUT = $KB_LAYOUT
+[ ! -z "$KB_VARIANT" ] && cfgset /etc/default/keyboard XKBVARIANT = $KB_VARIANT
+setupcon
+
+msg-blue "Configuring firewall ..."
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp
+
+msg-blue "Configuring sshd ..."
+if [[ "$SSHD_PUBKEY" != "" ]]; then
+  msg-blue "Enabling ssh pubkey authentication ..."
+  mkdir -p ~/.ssh
+  echo "$SSHD_PUBKEY" >> ~/.ssh/authorized_keys
+  chmod -R go= ~/.ssh
+  cfgset /etc/ssh/sshd_config PubkeyAuthentication yes
+  cfgset /etc/ssh/sshd_config PasswordAuthentication no
+fi
+if [ ! -z "$SSHD_PORT" ] && [ $SSHD_PORT -ne 22 ]; then
+  msg-blue "Changing sshd listening port to $SSHD_PORT ..."
+  ufw allow $SSHD_PORT/tcp
+  cfgset /etc/ssh/sshd_config Port $SSHD_PORT
+fi
+cfgset /etc/ssh/sshd_config PermitRootLogin no
+systemctl restart ssh
+
+if [ $SSHD_PORT -gt 0 ] && [ $SSHD_PORT -ne 22 ]; then
+  msg-blue "Installing endlessh tarpit on port 22 ..."
+  apt-get install -qy endlessh
+  cfgset /usr/lib/systemd/system/endlessh.service AmbientCapabilities = CAP_NET_BIND_SERVICE
+  cfgset /usr/lib/systemd/system/endlessh.service \# PrivateUsers
+  setcap 'cap_net_bind_service=+ep' /usr/bin/endlessh
+  systemctl enable endlessh
+  systemctl start endlessh
+fi
+
+msg-blue "Enabling firewall ..."
+ufw --force enable
+
+msg-green "Done."
+msg-yellow "NOTICE: try to open a new ssh session with the new settings before closing this one!!!"

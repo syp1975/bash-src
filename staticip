@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#configures ipv4 address as static using network manager.
+#it may terminate stablished ssh sessions.
+#usage: pg staticip <ip/cidr> [gateway] [dns] [connection name]
+#example: sudo pg staticip 192.168.1.10/24 192.168.1.1 1.1.1.1 "Wired connection 1"
+#example: sudo pg staticip 192.168.1.2/24
+
+#at least one parameter is needed
+if [ $# -lt 1 ]; then
+  echo >&2 -e "${RED}At least the ip address is needed.${NOFORMAT}"
+  exit -1
+fi
+
+#list network connection names
+FILES=$(ls -1 /etc/NetworkManager/system-connections/ | sed -e 's/\..*$//')
+NFILES=$(echo -n "$FILES" | grep -c '^')
+
+#no network connection found, network manager not installed?
+if [ $NFILES -lt 1 ]; then
+  echo >&2 -e "${RED}Network manager system connections is empty.${NOFORMAT}"
+  exit -2
+fi
+
+#network name
+if [[ "$4" != "" ]]; then
+  NAME="$4"
+#only 1 network connection found
+elif [ $NFILES -eq 1 ]; then
+  NAME="$FILES"
+else
+  #selection menu
+  PS3="${BLUE}Select the connection name to set its ipv4 address to $1: ${NOFORMAT}"
+  IFS=$'\n'
+  select NAME in "$FILES"; do
+    test -n "$NAME" && break
+    exit
+  done
+fi
+
+echo >&2 -e "${RED}Setting connection '$NAME' with static ipv4 address $1 ...${NOFORMAT}"
+nmcli con mod "$NAME" ipv4.addresses $1
+[ $# -ge 2 ] && nmcli con mod "$NAME" ipv4.gateway $2
+[ $# -ge 3 ] && nmcli con mod "$NAME" ipv4.dns "$3"
+nmcli con mod "$NAME" ipv4.method manual
+nmcli con up "$NAME"

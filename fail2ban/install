@@ -1,0 +1,33 @@
+#!/bin/bash
+#installs fail2ban
+#variables used:
+#FAIL2BAN_JAIL=initial jail.local file to download from the repo
+#FAIL2BAN_ACTIONS=space-separated-list of files to download relative to the repo, to the action.d folder
+#files can contain environment variables that will get replaced by its values before saving the file
+
+echo >&2 -e "${BLUE}Installing fail2ban ..."
+apt-get install -qy fail2ban
+
+if [ -f /etc/fail2ban/jail.local ]; then
+  echo >&2 -e "${BLUE}Keeping existing jail.local file.${NOFORMAT}"
+elif [ -z "$FAIL2BAN_JAIL" ]; then
+  echo >&2 -e "${BLUE}Setting up a new jail.local file ...${NOFORMAT}"
+  cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+  nano /etc/fail2ban/jail.local
+else
+  echo >&2 -e "${BLUE}Downloading jail.local ...${NOFORMAT}"
+  pg cat "$FAIL2BAN_JAIL" | envsubst > /etc/fail2ban/jail.local
+fi
+
+if [ ! -z "$FAILBAN_ACTIONS" ]; then
+  IFS=' '
+  for action in $FAILBAN_ACTIONS; do
+    name=$(basename action)
+    echo "${BLUE}Downloading action $name ...${NOFORMAT}"
+    pg cat "$action" | envsubst > "/etc/fail2ban/action.d/$name"
+  done
+fi
+
+echo >&2 -e "${BLUE}Enabling fail2ban ...${NOFORMAT}"
+systemctl enable fail2ban
+systemctl start fail2ban

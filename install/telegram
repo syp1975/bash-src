@@ -1,0 +1,23 @@
+#!/bin/bash
+#see https://github.com/fabianonline/telegram.sh
+#installs a script that sends messages/notifications to a telegram bot chat
+#uses this variables:
+#TELEGRAM_CONF=path of the telegram.sh config file (~/.telegram.sh.conf or /etc/telegram.sh.conf)
+#TELEGRAM_TOKEN=bot token
+#TELEGRAM_CHAT=id of the chat
+
+echo >&2 -e "${BLUE}Installing requeriments ...${NOFORMAT}"
+apt-get install -qqy jq
+
+echo >&2 -e "${BLUE}Downloading telegram.sh ...${NOFORMAT}"
+curl -sfS https://raw.githubusercontent.com/fabianonline/telegram.sh/master/telegram > /usr/local/bin/telegram
+
+#make it executable
+chmod 755 /usr/local/bin/telegram
+
+if [ ! -z "$TELEGRAM_CONF" ]; then
+  [ ! -z "$TELEGRAM_TOKEN" ] && cfgset "$TELEGRAM_CONF" TELEGRAM_TOKEN = \"$TELEGRAM_TOKEN\" '*****'
+  [ ! -z "$TELEGRAM_CHAT" ] && cfgset "$TELEGRAM_CONF" TELEGRAM_CHAT = \"$TELEGRAM_CHAT\" '*****'
+fi
+
+echo >&2 -e "${GREEN}Done.${NOFORMAT}"

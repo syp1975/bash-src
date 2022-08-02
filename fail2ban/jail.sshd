@@ -1,0 +1,12 @@
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1 $FAIL2BAN_IGNORE
+bantime = 15m
+findtime = 15m
+maxretry = 3
+
+[sshd]
+enabled = true
+mode    = aggressive
+ports   = $SSHD_PORT
+action  = iptables[name=SSH, port=$SSHD_PORT, protocol=tcp]
+          telegram

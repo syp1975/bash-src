@@ -1,0 +1,6 @@
+#!/bin/bash
+#apply pending updates and patches to the system
+apt-get update -q
+apt-get upgrade -qy
+apt-get autoremove --purge -qy
+apt-get clean -q
