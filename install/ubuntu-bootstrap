@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #setup basics on a fresh install of ubuntu.
 #installs some usefull packages, enables unattended upgrades and hardens remote access.
 #uses this variables:
