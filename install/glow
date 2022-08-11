@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#install glow, cli markdown viewer
+#install glow, a cli markdown viewer
 if grep -qxF 'deb [trusted=yes] https://repo.charm.sh/apt/ /' /etc/apt/sources.list.d/charm.list; then
   echo >&2 -e "${YELLOW}Charm repository already added to apt sources.${NOFORMAT}"
 else

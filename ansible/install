@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+#install and configure ansible
+#usage:
+#  install [--skip-remove] [--skip-hosts-edit] [...]
+#where:
+#  --skip-remove: will keep existing ansible installation
+#  --skip-hosts-edit: will not open the editor on the hosts file
+#  ...: will run ansible-playbook at the end, passing all the remaining parameters
+#use this optional variables:
+#  ANSIBLE_INSTALL_SRC=global remote repository name
+#  ANSIBLE_CONFIG_FILE=download ansible configuration file from remote repository (ex: "ansible/ansible.cfg"), save it as ~/.ansible.cfg
+#  ANSIBLE_CONFIG_SRC=remote repository name
+#  ANSIBLE_KEY_FILE=download a private rsa key file (ex: "rsa/ansible"), save it as ~/.ansible/id_rsa
+#  ANSIBLE_KEY_SRC=remote repository name
+#  ANSIBLE_KEY_PASSWORD=private key file password protection
+#  ANSIBLE_INVENTORY_FILE=download an inventory file (ex: "ansible/hosts.yml"), save it as ~/.ansible/hosts.yml
+#  ANSIBLE_INVENTORY_SRC=remote repository name
+#  ANSIBLE_REQUERIMENTS_FILE=download a requeriments file (ex: "ansible/requeriments.yml"), install it with ansible-galaxy
+#  ANSIBLE_REQUERIMENTS_SRC=remote repository name
+
+remove=1
+hosts=1
+while :; do
+  case "${1-}" in
+    --skip-remove) remove=0 ;;
+    --skip-hosts-edit) hosts=0 ;;
+    *) break ;;
+  esac
+  shift
+done
+
+if [ "$remove" -ne 0 ]; then
+  msg-blue "Removing old version of ansible ..."
+  apt-get remove -yqq ansible
+  apt-get autoremove --purge -yqq
+fi
+
+msg-blue "Adding ansible ppa ..."
+apt-get update -qq
+apt-get install -yqq software-properties-common
+apt-add-repository ppa:ansible/ansible
+apt-get update -qq
+
+msg-blue "Installing ansible ..."
+apt-get install -yqq ansible
+apt-get clean -qq
+
+mkdir -p ~/.ansible
+
+if [ ! -f ~/.ansible.cfg ]; then
+  if [ -n "$ANSIBLE_CONFIG_FILE" ]; then
+    src="" &&
+    [ -n "$ANSIBLE_CONFIG_SRC" ] && src="@$ANSIBLE_CONFIG_SRC"
+    [ -z "$src"] && [ -n "$ANSIBLE_INSTALL_SRC" ] && src="@$ANSIBLE_INSTALL_SRC"
+    msg-blue "Downloading ansible configuration file from '$ANSIBLE_CONFIG_FILE$src' ..."
+    pg cat "$src" "$ANSIBLE_CONFIG_FILE" > ~/.ansible.cfg
+  else
+    msg-blue "Configuring ansible with some defaults ..."
+    ansible-config init --disabled > ~/.ansible.cfg
+    cfgset ~/.ansible.cfg inventory = "~/.ansible/hosts.yml"
+    cfgset ~/.ansible.cfg remote_user = ansible
+    cfgset ~/.ansible.cfg become_password_file = "~/.ansible/become"
+    cfgset ~/.ansible.cfg roles_path = "~/.ansible/roles"
+    cfgset ~/.ansible.cfg module_name = command
+    cfgset ~/.ansible.cfg private_key_file = "~/.ansible/id_rsa"
+    cfgset ~/.ansible.cfg vault_password_file = "~/.ansible/vault"
+    cfgset ~/.ansible.cfg fact_caching = jsonfile
+    cfgset ~/.ansible.cfg fact_caching_connection = /tmp
+    cfgset ~/.ansible.cfg fact_path = "~/.ansible/facts"
+    cfgset ~/.ansible.cfg retry_files_enabled = False
+    cfgset ~/.ansible.cfg local_tmp = /tmp
+    cfgset ~/.ansible.cfg verbose_to_stderr = True
+  fi
+fi
+
+if [ ! -f ~/.ansible/id_rsa ]; then
+  if [ -n "$ANSIBLE_KEY_FILE" ]; then
+    src=""
+    [ -n "$ANSIBLE_KEY_SRC" ] && src="@$ANSIBLE_KEY_SRC"
+    [ -z "$src"] && [ -n "$ANSIBLE_INSTALL_SRC" ] && src="@$ANSIBLE_INSTALL_SRC"
+    msg-blue "Downloading a private rsa key file from '$ANSIBLE_KEY_FILE$src' ..."
+    pg cat "$src" "$ANSIBLE_KEY_FILE" > ~/.ansible/id_rsa
+    ssh-keygen -y -f ~/.ansible/id_rsa -P "$ANSIBLE_KEY_PASSWORD" > ~/.ansible/id_rsa.pub
+  else
+    msg-blue "Creating a private rsa key file ..."
+    ssh-keygen -q -t rsa -f ~/.ansible/id_rsa -N "$ANSIBLE_KEY_PASSWORD" -C "ansible"
+  fi
+  msg-blue "Add this to the ~/.ssh/authorized_keys file on remote hosts for the user that ansible will connect with:"
+  cat ~/.ansible/id_rsa.pub
+fi
+
+if [ ! -f ~/.ansible/hosts.yml ] && [ -n "$ANSIBLE_INVENTORY_FILE" ]; then
+  src=""
+  [ -n "$ANSIBLE_INVENTORY_SRC" ] && src="@$ANSIBLE_INVENTORY_SRC"
+  [ -z "$src"] && [ -n "$ANSIBLE_INSTALL_SRC" ] && src="@$ANSIBLE_INSTALL_SRC"
+  msg-blue "Downloading an inventory file from '$ANSIBLE_INVENTORY_FILE$src' ..."
+  pg cat "$src" "$ANSIBLE_INVENTORY_FILE" > ~/.ansible/hosts.yml
+fi
+if [ ! -f ~/.ansible/hosts.yml ]; then
+  msg-blus "Generating a dummy '~/.ansible/hosts.yml' file ..."
+  cat <<EOF >> ~/.ansible/hosts.yml
+
+EOF
+  [ "$hosts" -ne 0 ] && ${EDITOR-nano} ~/.ansible/hosts.yml
+fi
+
+if [ ! -f ~/.ansible/requeriments.yml ] && [ -n "$ANSIBLE_REQUERIMENTS_FILE" ]; then
+  src=""
+  [ -n "$ANSIBLE_REQUERIMENTS_SRC" ] && src="@$ANSIBLE_REQUERIMENTS_SRC"
+  [ -z "$src"] && [ -n "$ANSIBLE_INSTALL_SRC" ] && src="@$ANSIBLE_INSTALL_SRC"
+  msg-blue "Downloading requeriments file from '$ANSIBLE_REQUERIMENTS_FILE$src' ..."
+  pg cat "$src" "$ANSIBLE_REQUERIMENTS_FILE" > ~/.ansible/requeriments.yml
+fi
+if [ -f ~/.ansible/requeriments.yml ]; then
+  msg-blue "Installing requeriments ..."
+  ansible-galaxy install -r ~/.ansible/requeriments.yml
+fi
+
+if [ "$#" -gt 0 ]; then
+  msg-blue "Running playbooks ..."
+  msg-cyan "ansible-playbook $@"
+  ansible-playbook "$@"
+fi
+
+msg-blue "Setting file permissions ..."
+chmod 700 ~/.ansible
+chmod 600 ~/.ansible.cfg
+chmod 600 ~/.ansible/id_rsa
+
+msg-green "Done."
