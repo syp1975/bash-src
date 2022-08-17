@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#warning: this script will reset your home folder contents using a git repository, you will lose data!
+#its purpose is to keep your home folder in sync on multiple hosts using git.
+#see this post from Seth Kenlon for more info: https://opensource.com/article/21/4/git-home.
+#usage:
+#  profile-repo <repo> [--branch <branch-name>] [--|<curl_parameters>]
+#where:
+#  repo: git repository source (ssh)
+#  branch-name: main is the default value
+#  --: read from the tty the ssh private key
+#  curl_parameters: the rest of parameters are passed to curl to download the ssh private key
+#    if omitted, the private key is readed from stdin
+
+#repo source
+src="$1"
+[ -z "$src" ] && echo >&2 "${RED}git repository source is missing${NOCOLOR}" && return 1
+shift
+
+#extract name of the host that holds the repository (github.com?)
+host=$(echo "$src" | sed 's/.*@\(.*\):.*/\1/')
+[ -z "$host" ] && echo >&2 "${RED}git repository source should be in the form of 'user@host:path'${NOCOLOR}" && return 2
+
+branch=main
+[ "$1" == "--branch" ] && shift && branch="$1" && shift
+[ -z "$branch" ] && echo >&2 "${RED}branch name is missing${NOCOLOR}" && return 3
+
+#ssh config folder for user
+cd "$HOME" || return 4
+mkdir -p .ssh
+chmod 700 .ssh
+
+#private key for remote host
+key_file="$HOME/.ssh/$host"
+if [ $# -eq 0 ] && tty -s; then
+  #none given
+  key_file=''
+elif [ $# -eq 0 ] || [ "$1" == "--" ]; then
+  #read from stdin
+  tty -s && [ "$1" == "--" ] && echo >&2 "${CYAN}paste the private key. press Ctrl+D to finish:{$NOCOLOR}"
+  key=$(cat)
+  [ -n "$key" ] && echo "$key" > "$key_file" || key_file=''  
+else
+  #download with curl
+  curl -sfS "$@" > "$key_file"
+fi
+
+#required permissions
+[ -n "$key_file" ] && chmod 600 "$key_file"
+
+#make the home folder a repository
+git init
+
+#configure git to use the private key for this repo when connecting with ssh
+[ -n "$key_file" ] && git config --add --local core.sshCommand "ssh -i \"$key_file\""
+
+#clone repo in home folder
+git remote add origin "$src"
+git pull
+git reset --hard "origin/$branch"
