@@ -36,7 +36,7 @@ if [ $# -eq 0 ] && tty -s; then
   key_file=''
 elif [ $# -eq 0 ] || [ "$1" == "--" ]; then
   #read from stdin
-  tty -s && [ "$1" == "--" ] && echo >&2 "${CYAN}paste the private key. press Ctrl+D to finish:{$NOCOLOR}"
+  tty && [ "$1" == "--" ] && echo >&2 "${CYAN}paste the private key. press Ctrl+D to finish:{$NOCOLOR}"
   key=$(cat)
   [ -n "$key" ] && echo "$key" > "$key_file" || key_file=''  
 else
