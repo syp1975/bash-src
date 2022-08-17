@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-#warning: this script will reset your home folder contents using a git repository, you will lose data!
+#warning: this script will reset your home folder contents using a git repository and you will loose its content!
 #its purpose is to keep your home folder in sync on multiple hosts using git.
 #see this post from Seth Kenlon for more info: https://opensource.com/article/21/4/git-home.
 #usage:
-#  profile-repo <repo> [--branch <branch-name>] [--|<curl_parameters>]
+#  sync-profile <repo> [--branch <branch-name>] [--|--key <key_file>|<curl_parameters>]
 #where:
-#  repo: git repository source (ssh)
-#  branch-name: main is the default value
+#  <repo>: git repository source (ssh)
+#  <branch-name>: defaults to main
 #  --: read from the tty the ssh private key
-#  curl_parameters: the rest of parameters are passed to curl to download the ssh private key
-#    if omitted, the private key is readed from stdin
+#  <key_file>: use this private key file for ssh authentication
+#  <curl_parameters>: the rest of parameters are passed to curl to download the ssh private key
 
 #repo source
 src="$1"
@@ -31,29 +31,30 @@ chmod 700 .ssh
 
 #private key for remote host
 key_file="$HOME/.ssh/$host"
-if [ $# -eq 0 ] && tty -s; then
-  #none given
-  key_file=''
-elif [ $# -eq 0 ] || [ "$1" == "--" ]; then
-  #read from stdin
-  tty && [ "$1" == "--" ] && echo >&2 "${CYAN}paste the private key. press Ctrl+D to finish:{$NOCOLOR}"
-  key=$(cat)
+if [ "$1" == "--" ]; then
+  #read from tty
+  echo >&2 "${CYAN}paste the private key. press Ctrl+D to finish:${NOCOLOR}"
+  key=$(cat /dev/tty)
   [ -n "$key" ] && echo "$key" > "$key_file" || key_file=''  
-else
+elif [ "$1" == "--key" ]; then
+  shift
+  key_file="$1"
+  [ ! -r "$key_file" ] && echo >&2 "${RED}private key file is missing or not readable${NOCOLOR}" && return 5  
+elif [ $# -gt 0 ]; then
   #download with curl
   curl -sfS "$@" > "$key_file"
 fi
 
 #required permissions
-[ -n "$key_file" ] && chmod 600 "$key_file"
+[ -f "$key_file" ] && chmod 600 "$key_file"
 
 #make the home folder a repository
 git init
 
 #configure git to use the private key for this repo when connecting with ssh
-[ -n "$key_file" ] && git config --add --local core.sshCommand "ssh -i \"$key_file\""
+[ -f "$key_file" ] && git config --add --local core.sshCommand "ssh -o StrictHostKeyChecking=no -i \"$key_file\""
 
 #clone repo in home folder
 git remote add origin "$src"
-git pull
+git pull origin "$branch"
 git reset --hard "origin/$branch"
