@@ -38,8 +38,8 @@ else
 fi
 
 echo >&2 -e "${RED}Setting connection '$NAME' with static ipv4 address $1 ...${NOFORMAT}"
-nmcli con mod "$NAME" ipv4.addresses $1
-[ $# -ge 2 ] && nmcli con mod "$NAME" ipv4.gateway $2
-[ $# -ge 3 ] && nmcli con mod "$NAME" ipv4.dns "$3"
-nmcli con mod "$NAME" ipv4.method manual
-nmcli con up "$NAME"
+sudo nmcli con mod "$NAME" ipv4.addresses $1
+[ $# -ge 2 ] && sudo nmcli con mod "$NAME" ipv4.gateway $2
+[ $# -ge 3 ] && sudo nmcli con mod "$NAME" ipv4.dns "$3"
+sudo nmcli con mod "$NAME" ipv4.method manual
+sudo nmcli con up "$NAME"

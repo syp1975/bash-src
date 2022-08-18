@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#install and configure ansible
+#install (uses sudo) and configure (for current user) ansible
 #usage:
 #  install [--skip-remove] [--skip-hosts-edit] [...]
 #where:
@@ -31,19 +31,19 @@ done
 
 if [ "$remove" -ne 0 ]; then
   msg-blue "Removing old version of ansible ..."
-  apt-get remove -yqq ansible
-  apt-get autoremove --purge -yqq
+  sudo apt-get remove -yqq ansible
+  sudo apt-get autoremove --purge -yqq
 fi
 
 msg-blue "Adding ansible ppa ..."
-apt-get update -qq
-apt-get install -yqq software-properties-common
-apt-add-repository ppa:ansible/ansible
-apt-get update -qq
+sudo apt-get update -qq
+sudo apt-get install -yqq software-properties-common
+sudo apt-add-repository ppa:ansible/ansible
+sudo apt-get update -qq
 
 msg-blue "Installing ansible ..."
-apt-get install -yqq ansible
-apt-get clean -qq
+sudo apt-get install -yqq ansible
+sudo apt-get clean -qq
 
 mkdir -p ~/.ansible
 
@@ -97,7 +97,7 @@ if [ ! -f ~/.ansible/hosts.yml ] && [ -n "$ANSIBLE_INVENTORY_FILE" ]; then
   pg cat "$src" "$ANSIBLE_INVENTORY_FILE" > ~/.ansible/hosts.yml
 fi
 if [ ! -f ~/.ansible/hosts.yml ]; then
-  msg-blus "Generating a dummy '~/.ansible/hosts.yml' file ..."
+  msg-blue "Generating a dummy '~/.ansible/hosts.yml' file ..."
   cat <<EOF >> ~/.ansible/hosts.yml
 
 EOF

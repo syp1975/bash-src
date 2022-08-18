@@ -7,13 +7,13 @@
 #TELEGRAM_CHAT=id of the chat
 
 echo >&2 -e "${BLUE}Installing requeriments ...${NOFORMAT}"
-apt-get install -qqy jq
+sudo apt-get install -qqy jq
 
 echo >&2 -e "${BLUE}Downloading telegram.sh ...${NOFORMAT}"
-curl -sfS https://raw.githubusercontent.com/fabianonline/telegram.sh/master/telegram > /usr/local/bin/telegram
+sudo curl -sfS https://raw.githubusercontent.com/fabianonline/telegram.sh/master/telegram > /usr/local/bin/telegram
 
 #make it executable
-chmod 755 /usr/local/bin/telegram
+sudo chmod 755 /usr/local/bin/telegram
 
 if [ ! -z "$TELEGRAM_CONF" ]; then
   [ ! -z "$TELEGRAM_TOKEN" ] && cfgset "$TELEGRAM_CONF" TELEGRAM_TOKEN = \"$TELEGRAM_TOKEN\" '*****'

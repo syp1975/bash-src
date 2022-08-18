@@ -17,36 +17,36 @@
 
 if [ ! -z "$UNWANTED_SERVICES" ]; then
   msg-blue "Disabling unwanted services ..."
-  systemctl stop "$UNWANTED_SERVICES"
-  systemctl disable "$UNWANTED_SERVICES"
+  sudo systemctl stop "$UNWANTED_SERVICES"
+  sudo systemctl disable "$UNWANTED_SERVICES"
 fi
 
 if [ ! -z "$UNWANTED_PACKAGES" ]; then
   msg-blue "Removing unwanted packages ..."
-  apt-get purge -qy $UNWANTED_PACKAGES
+  sudo apt-get purge -qy $UNWANTED_PACKAGES
 fi
 
 msg-blue "Updating ..."
-apt-get update -q && apt-get upgrade -qy
+sudo apt-get update -q && sudo apt-get upgrade -qy
 
 msg-blue "Installing packages ..."
-apt-get install -qy ufw $WANTED_PACKAGES
+sudo apt-get install -qy ufw $WANTED_PACKAGES
 
 msg-blue "Cleaning ..."
-apt-get install -qqf && apt-get autoremove --purge -qqy && apt-get clean -qq
+sudo apt-get install -qqf && sudo apt-get autoremove --purge -qqy && sudo apt-get clean -qq
 
 msg-blue "Configuring unattended upgrades ..."
 cfgset /etc/apt/apt.conf.d/50unattended-upgrades 'Unattended-Upgrade::Remove-Unused-Dependencies' '"true";'
 cfgset /etc/apt/apt.conf.d/50unattended-upgrades 'Unattended-Upgrade::Automatic-Reboot' '"true";'
 cfgset /etc/apt/apt.conf.d/50unattended-upgrades 'Unattended-Upgrade::Automatic-Reboot-WithUsers' '"false";'
 cfgset /etc/apt/apt.conf.d/50unattended-upgrades 'Unattended-Upgrade::Automatic-Reboot-Time' '"02:00";'
-systemctl restart unattended-upgrades.service
+sudo systemctl restart unattended-upgrades.service
 
 msg-blue "Removing unwanted MOTD modules ..."
 cfgset /etc/default/motd-news ENABLED = 0
 if [ ! -z "$UNWANTED_MOTD" ]; then
   pushd /etc/update-motd.d/
-  chmod -x "$UNWANTED_MOTD"
+  sudo chmod -x "$UNWANTED_MOTD"
   popd
 fi
 
@@ -56,8 +56,8 @@ if [ ! -z "$WANTED_MOTD" ]; then
   for file in "$WANTED_MOTD"; do
     name=$(basename "$file")
     msg-blue "Installing motd $name ..."
-    pg cat "$file" | envsubst > "$name"
-    chmod +x "$name"
+    pg cat "$file" | envsubst | sudo tee "$name"
+    sudo chmod +x "$name"
   done
   popd
 fi
@@ -67,18 +67,18 @@ if [ ! -z "$LOCALES" ]; then
   IFS=' '
   LNG=''
   #adds computer locale by default
-  echo 'C.UTF-8 UTF-8' > /etc/locale.gen
+  echo 'C.UTF-8 UTF-8' | sudo tee /etc/locale.gen
   for LOCALE in $LOCALES; do
     msg-blue "Adding locale $LOCALE $CHARSET ..."
-    echo $LOCALE $CHARSET > /etc/locale.gen
+    echo "$LOCALE $CHARSET" | sudo tee -a /etc/locale.gen
     if [ -z "$LNG" ]; then
       LNG=$LOCALE
     fi
   done
   msg-blue "Generating locales ..."
-  locale-gen
+  sudo locale-gen
   msg-blue "Setting default locale to $LNG ..."
-  update-locale LANG=$LNG
+  sudo update-locale LANG=$LNG
 fi
 
 msg-blue "Configuring keyboard map and character set ..."
@@ -86,42 +86,42 @@ msg-blue "Configuring keyboard map and character set ..."
 [ ! -z "$CODESET" ] && cfgset /etc/default/console-setup CODESET = $CODESET
 [ ! -z "$KB_LAYOUT" ] && cfgset /etc/default/keyboard XKBLAYOUT = $KB_LAYOUT
 [ ! -z "$KB_VARIANT" ] && cfgset /etc/default/keyboard XKBVARIANT = $KB_VARIANT
-setupcon
+sudo setupcon
 
 msg-blue "Configuring firewall ..."
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp
 
 msg-blue "Configuring sshd ..."
 if [[ "$SSHD_PUBKEY" != "" ]]; then
   msg-blue "Enabling ssh pubkey authentication ..."
-  mkdir -p ~/.ssh
-  echo "$SSHD_PUBKEY" >> ~/.ssh/authorized_keys
-  chmod -R go= ~/.ssh
+  sudo mkdir -p ~/.ssh
+  echo "$SSHD_PUBKEY" | sudo tee -a ~/.ssh/authorized_keys
+  sudo chmod -R go= ~/.ssh
   cfgset /etc/ssh/sshd_config PubkeyAuthentication yes
   cfgset /etc/ssh/sshd_config PasswordAuthentication no
 fi
 if [ ! -z "$SSHD_PORT" ] && [ $SSHD_PORT -ne 22 ]; then
   msg-blue "Changing sshd listening port to $SSHD_PORT ..."
-  ufw allow $SSHD_PORT/tcp
+  sudo ufw allow $SSHD_PORT/tcp
   cfgset /etc/ssh/sshd_config Port $SSHD_PORT
 fi
 cfgset /etc/ssh/sshd_config PermitRootLogin no
-systemctl restart ssh
+sudo systemctl restart ssh
 
 if [ $SSHD_PORT -gt 0 ] && [ $SSHD_PORT -ne 22 ]; then
   msg-blue "Installing endlessh tarpit on port 22 ..."
-  apt-get install -qy endlessh
+  sudo apt-get install -qy endlessh
   cfgset /usr/lib/systemd/system/endlessh.service AmbientCapabilities = CAP_NET_BIND_SERVICE
   cfgset /usr/lib/systemd/system/endlessh.service \# PrivateUsers
-  setcap 'cap_net_bind_service=+ep' /usr/bin/endlessh
-  systemctl enable endlessh
-  systemctl start endlessh
+  sudo setcap 'cap_net_bind_service=+ep' /usr/bin/endlessh
+  sudo systemctl enable endlessh
+  sudo systemctl start endlessh
 fi
 
 msg-blue "Enabling firewall ..."
-ufw --force enable
+sudo ufw --force enable
 
 msg-green "Done."
 msg-yellow "NOTICE: try to open a new ssh session with the new settings before closing this one!!!"

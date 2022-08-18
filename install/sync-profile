@@ -49,12 +49,17 @@ fi
 [ -f "$key_file" ] && chmod 600 "$key_file"
 
 #make the home folder a repository
-git init
+git init -b "$branch"
 
 #configure git to use the private key for this repo when connecting with ssh
 [ -f "$key_file" ] && git config --add --local core.sshCommand "ssh -o StrictHostKeyChecking=no -i \"$key_file\""
 
-#clone repo in home folder
+#clone repo in home folder and prepare it for pushing
 git remote add origin "$src"
-git pull origin "$branch"
+git fetch
 git reset --hard "origin/$branch"
+git branch --set-upstream-to origin/"$branch"
+
+#set restrictive file permissions
+chmod -Rf o-w *
+chmod -Rf go= .*

@@ -6,17 +6,17 @@
 #files can contain environment variables that will get replaced by its values before saving the file
 
 echo >&2 -e "${BLUE}Installing fail2ban ..."
-apt-get install -qy fail2ban
+sudo apt-get install -qy fail2ban
 
 if [ -f /etc/fail2ban/jail.local ]; then
   echo >&2 -e "${BLUE}Keeping existing jail.local file.${NOFORMAT}"
 elif [ -z "$FAIL2BAN_JAIL" ]; then
   echo >&2 -e "${BLUE}Setting up a new jail.local file ...${NOFORMAT}"
-  cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
-  nano /etc/fail2ban/jail.local
+  sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+  sudo nano /etc/fail2ban/jail.local
 else
   echo >&2 -e "${BLUE}Downloading jail.local ...${NOFORMAT}"
-  pg cat "$FAIL2BAN_JAIL" | envsubst > /etc/fail2ban/jail.local
+  pg cat "$FAIL2BAN_JAIL" | envsubst | sudo tee /etc/fail2ban/jail.local
 fi
 
 if [ ! -z "$FAILBAN_ACTIONS" ]; then
@@ -24,10 +24,10 @@ if [ ! -z "$FAILBAN_ACTIONS" ]; then
   for action in $FAILBAN_ACTIONS; do
     name=$(basename action)
     echo "${BLUE}Downloading action $name ...${NOFORMAT}"
-    pg cat "$action" | envsubst > "/etc/fail2ban/action.d/$name"
+    pg cat "$action" | envsubst | sudo tee "/etc/fail2ban/action.d/$name"
   done
 fi
 
 echo >&2 -e "${BLUE}Enabling fail2ban ...${NOFORMAT}"
-systemctl enable fail2ban
-systemctl start fail2ban
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
