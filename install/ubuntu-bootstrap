@@ -56,7 +56,7 @@ if [ ! -z "$WANTED_MOTD" ]; then
   for file in "$WANTED_MOTD"; do
     name=$(basename "$file")
     msg-blue "Installing motd $name ..."
-    pg cat "$file" | envsubst | sudo tee "$name"
+    pg cat "$file" | envsubst | sudo tee "$name" > /dev/null
     sudo chmod +x "$name"
   done
   popd
@@ -67,10 +67,10 @@ if [ ! -z "$LOCALES" ]; then
   IFS=' '
   LNG=''
   #adds computer locale by default
-  echo 'C.UTF-8 UTF-8' | sudo tee /etc/locale.gen
+  echo 'C.UTF-8 UTF-8' | sudo tee /etc/locale.gen > /dev/null
   for LOCALE in $LOCALES; do
     msg-blue "Adding locale $LOCALE $CHARSET ..."
-    echo "$LOCALE $CHARSET" | sudo tee -a /etc/locale.gen
+    echo "$LOCALE $CHARSET" | sudo tee -a /etc/locale.gen > /dev/null
     if [ -z "$LNG" ]; then
       LNG=$LOCALE
     fi
@@ -97,7 +97,7 @@ msg-blue "Configuring sshd ..."
 if [[ "$SSHD_PUBKEY" != "" ]]; then
   msg-blue "Enabling ssh pubkey authentication ..."
   sudo mkdir -p ~/.ssh
-  echo "$SSHD_PUBKEY" | sudo tee -a ~/.ssh/authorized_keys
+  echo "$SSHD_PUBKEY" | sudo tee -a ~/.ssh/authorized_keys > /dev/null
   sudo chmod -R go= ~/.ssh
   cfgset /etc/ssh/sshd_config PubkeyAuthentication yes
   cfgset /etc/ssh/sshd_config PasswordAuthentication no

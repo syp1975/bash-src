@@ -10,7 +10,7 @@ echo >&2 -e "${BLUE}Installing requeriments ...${NOFORMAT}"
 sudo apt-get install -qqy jq
 
 echo >&2 -e "${BLUE}Downloading telegram.sh ...${NOFORMAT}"
-sudo curl -sfS https://raw.githubusercontent.com/fabianonline/telegram.sh/master/telegram > /usr/local/bin/telegram
+curl -sfS https://raw.githubusercontent.com/fabianonline/telegram.sh/master/telegram | sudo tee /usr/local/bin/telegram > /dev/null
 
 #make it executable
 sudo chmod 755 /usr/local/bin/telegram
