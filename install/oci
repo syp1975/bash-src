@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #installs oracle cloud infraestructure cli for the current user
-bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh) --accept-all-defaults"
+curl -sfS https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh | bash /dev/stdin --accept-all-defaults
 if [ -z "$OCI_CONFIG_FILE" ]; then
   cat <<EOF >&2
 Steps to configure:

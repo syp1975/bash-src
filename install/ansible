@@ -18,13 +18,13 @@
 
 pkg=$(dpkg-query -W ansible 2> /dev/null)
 [[ "$pkg" == *"ppa"* ]] && ppa=1 || ppa=0
-if [ -n "$pkg" ] && [ "$ppa" -eq 0]; then
+if [ -n "$pkg" ] && [ "$ppa" -eq 0 ]; then
   msg-blue "Removing non ppa version of ansible ..."
   sudo apt-get remove -yqq ansible
   sudo apt-get autoremove --purge -yqq
 fi
 
-if [ "$ppa" -ne 0 ]; then
+if [ "$ppa" -eq 0 ]; then
   msg-blue "Adding ansible ppa ..."
   sudo apt-get update -qqq
   sudo apt-get install -yqq software-properties-common
