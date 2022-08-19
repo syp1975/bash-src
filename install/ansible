@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 #install (uses sudo) and configure (for current user) ansible
 #usage:
-#  install [--skip-remove] [--skip-hosts-edit] [...]
+#  install [...]
 #where:
-#  --skip-remove: will keep existing ansible installation
-#  --skip-hosts-edit: will not open the editor on the hosts file
 #  ...: will run ansible-playbook at the end, passing all the remaining parameters
 #use this optional variables:
 #  ANSIBLE_INSTALL_SRC=global remote repository name
@@ -13,39 +11,33 @@
 #  ANSIBLE_KEY_FILE=download a private rsa key file (ex: "rsa/ansible"), save it as ~/.ansible/id_rsa
 #  ANSIBLE_KEY_SRC=remote repository name
 #  ANSIBLE_KEY_PASSWORD=private key file password protection
-#  ANSIBLE_INVENTORY_FILE=download an inventory file (ex: "ansible/hosts.yml"), save it as ~/.ansible/hosts.yml
+#  ANSIBLE_INVENTORY_FILES=colon separated list of inventory files to download and save on ~/.ansible/inventory/
 #  ANSIBLE_INVENTORY_SRC=remote repository name
 #  ANSIBLE_REQUERIMENTS_FILE=download a requeriments file (ex: "ansible/requeriments.yml"), install it with ansible-galaxy
 #  ANSIBLE_REQUERIMENTS_SRC=remote repository name
 
-remove=1
-hosts=1
-while :; do
-  case "${1-}" in
-    --skip-remove) remove=0 ;;
-    --skip-hosts-edit) hosts=0 ;;
-    *) break ;;
-  esac
-  shift
-done
-
-if [ "$remove" -ne 0 ]; then
-  msg-blue "Removing old version of ansible ..."
+pkg=$(dpkg-query -W ansible 2> /dev/null)
+[[ "$pkg" == *"ppa"* ]] && ppa=1 || ppa=0
+if [ -n "$pkg" ] && [ "$ppa" -eq 0]; then
+  msg-blue "Removing non ppa version of ansible ..."
   sudo apt-get remove -yqq ansible
   sudo apt-get autoremove --purge -yqq
 fi
 
-msg-blue "Adding ansible ppa ..."
-sudo apt-get update -qq
-sudo apt-get install -yqq software-properties-common
-sudo apt-add-repository ppa:ansible/ansible
-sudo apt-get update -qq
+if [ "$ppa" -ne 0 ]; then
+  msg-blue "Adding ansible ppa ..."
+  sudo apt-get update -qqq
+  sudo apt-get install -yqq software-properties-common
+  sudo apt-add-repository ppa:ansible/ansible
+  sudo apt-get update -qqq
 
-msg-blue "Installing ansible ..."
-sudo apt-get install -yqq ansible
-sudo apt-get clean -qq
+  msg-blue "Installing ansible ..."
+  sudo apt-get install -yqq ansible
+  sudo apt-get clean -qqq
+fi
 
 mkdir -p ~/.ansible
+mkdir -p ~/.ansible/inventory
 
 if [ ! -f ~/.ansible.cfg ]; then
   if [ -n "$ANSIBLE_CONFIG_FILE" ]; then
@@ -57,7 +49,7 @@ if [ ! -f ~/.ansible.cfg ]; then
   else
     msg-blue "Configuring ansible with some defaults ..."
     ansible-config init --disabled > ~/.ansible.cfg
-    cfgset ~/.ansible.cfg inventory = "~/.ansible/hosts.yml"
+    cfgset ~/.ansible.cfg inventory = "~/.ansible/inventory/"
     cfgset ~/.ansible.cfg remote_user = ansible
     cfgset ~/.ansible.cfg become_password_file = "~/.ansible/become"
     cfgset ~/.ansible.cfg roles_path = "~/.ansible/roles"
@@ -89,19 +81,20 @@ if [ ! -f ~/.ansible/id_rsa ]; then
   cat ~/.ansible/id_rsa.pub
 fi
 
-if [ ! -f ~/.ansible/hosts.yml ] && [ -n "$ANSIBLE_INVENTORY_FILE" ]; then
+if [ -n "$ANSIBLE_INVENTORY_FILES" ]; then
   src=""
   [ -n "$ANSIBLE_INVENTORY_SRC" ] && src="@$ANSIBLE_INVENTORY_SRC"
   [ -z "$src"] && [ -n "$ANSIBLE_INSTALL_SRC" ] && src="@$ANSIBLE_INSTALL_SRC"
-  msg-blue "Downloading an inventory file from '$ANSIBLE_INVENTORY_FILE$src' ..."
-  pg cat "$src" "$ANSIBLE_INVENTORY_FILE" > ~/.ansible/hosts.yml
-fi
-if [ ! -f ~/.ansible/hosts.yml ]; then
-  msg-blue "Generating a dummy '~/.ansible/hosts.yml' file ..."
-  cat <<EOF >> ~/.ansible/hosts.yml
-
-EOF
-  [ "$hosts" -ne 0 ] && ${EDITOR-nano} ~/.ansible/hosts.yml
+  IFS=':'
+  for file in "$ANSIBLE_INVENTORY_FILES"; do
+    name=$(basename "$file")
+    if [ -f ~/.ansible/inventory/$name ]; then
+      msg-cyan "Skipping inventory file '$file$src': file already exists"
+    else
+      msg-blue "Downloading inventory file '$file$src' ..."
+      pg cat "$src" "$file" > ~/.ansible/inventory/$name
+    fi
+  done
 fi
 
 if [ ! -f ~/.ansible/requeriments.yml ] && [ -n "$ANSIBLE_REQUERIMENTS_FILE" ]; then
@@ -116,15 +109,15 @@ if [ -f ~/.ansible/requeriments.yml ]; then
   ansible-galaxy install -r ~/.ansible/requeriments.yml
 fi
 
+msg-blue "Setting file permissions ..."
+chmod 700 ~/.ansible
+chmod 600 ~/.ansible.cfg
+chmod 600 ~/.ansible/id_rsa
+
 if [ "$#" -gt 0 ]; then
   msg-blue "Running playbooks ..."
   msg-cyan "ansible-playbook $@"
   ansible-playbook "$@"
 fi
-
-msg-blue "Setting file permissions ..."
-chmod 700 ~/.ansible
-chmod 600 ~/.ansible.cfg
-chmod 600 ~/.ansible/id_rsa
 
 msg-green "Done."
