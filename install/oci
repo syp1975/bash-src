@@ -1,22 +1,34 @@
 #!/usr/bin/env bash
-#installs oracle cloud infraestructure cli for the current user
-curl -sfS https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh | bash /dev/stdin --accept-all-defaults
-if [ -z "$OCI_CONFIG_FILE" ]; then
-  cat <<EOF >&2
+#installs oracle cloud infraestructure sdk and cli and configures it for the current user
+sudo apt-get install -yqq python3 python3-pip
+sudo pip install oci oci-cli
+if [ ! -f ~/.oci/config ]; then
+  if [ -z "$OCI_CONFIG_FILE" ]; then
+    cat <<EOF >&2
 Steps to configure:
 In the browser, open oracle cloud administration console,
 Navigate to Identity & Security > Users,
-Create a user for oci cli access to your tenancy, either IDCS or local IAM user.
+Create a user to access your tenancy from oci sdk and cli, either a IDCS or a local IAM user.
 Add an API key.
-Download private and public key files.
-Upload private key to ~/.oci/oci_private_key.pem, set privacy permissions accordingly.
-Copy config file contents and paste it in ~/.oci/config, setting the right path to the private key_file.
+Put the API private key file in ~/.oci/, chmod 600 the file.
+Copy config file contents and paste it in ~/.oci/config.
+Set the right path to the API private key in `key_file`.
 EOF
-else
-  echo >&2 -e "${BLUE}Downloading oci config file from \"$OCI_CONFIG\".${NOFORMAT}"
-  params=()
-  [ ! -z "$OCI_CONFIG_SRC" ] && params+=("@$OCI_CONFIG_SRC")
-  pg "${params[@]}" cat "$OCI_CONFIG_FILE" > ~/.oci/config
-  chmod 600 ~/.oci/config
-  echo >&2 -e "${GREEN}Done.{NOFORMAT}"  
+  else
+    echo >&2 -e "${BLUE}Downloading oci config file ...${NOFORMAT}"
+    [ -n "$OCI_CONFIG_SRC" ] && src="@$OCI_CONFIG_SRC" || src=''
+    pg "$src" cat "$OCI_CONFIG_FILE" > ~/.oci/config
+  fi
 fi
+if [ -n "$OCI_API_KEY_FILE" ]; then
+  name=$(basename "$OCI_API_KEY_FILE")
+  if [ -f "$HOME/.oci/$name" ]; then
+    echo >&2 -e "${CYAN}Oci api private key file already exists, skipping ...${NOFORMAT}"
+  else
+    echo >&2 -e "${BLUE}Downloading oci api private key file ...${NOFORMAT}"
+    [ -n "$OCI_API_KEY_SRC" ] && src="@$OCI_API_KEY_SRC" || src=''
+    pg "$src" cat "$OCI_API_KEY_FILE" > "$HOME/.oci/$name"
+  fi
+  chmod 600 "$HOME/.oci/$name"
+fi
+echo >&2 -e "${GREEN}Done.${NOFORMAT}"  
