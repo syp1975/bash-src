@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#install teamviewer
+#update keyring
+sudo apt-get update
+sudo apt-get install -qy curl apt-transport-https gnupg2
+curl -sfS https://dl.teamviewer.com/download/linux/signature/TeamViewer2017.asc | gpg --dearmor | sudo tee /usr/share/keyrings/teamview.gpg > /dev/null
+if grep -qxF 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/teamview.gpg] \ http://linux.teamviewer.com/deb stable main" \ | sudo tee /etc/apt/sources.list.d/teamviewer.list' /etc/apt/sources.list.d/teamviewer.list; then
+  echo >&2 -e "${YELLOW}Teamviewer repository already added to apt sources.${NOFORMAT}"
+else
+  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/teamview.gpg] http://linux.teamviewer.com/deb stable main" | sudo tee /etc/apt/sources.list.d/teamviewer.list > /dev/null
+fi
+sudo apt-get update -q
+echo Y | sudo apt-get install -qy teamviewer
+sudo apt-get clean -q
